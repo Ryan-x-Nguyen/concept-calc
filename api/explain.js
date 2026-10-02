@@ -35,7 +35,8 @@ Rules:
     const data = await r.json();
     if (!r.ok) {
       console.error("Gemini error:", JSON.stringify(data));
-      return res.status(502).json({ error: "AI service error. Try again in a minute." });
+      const detail = (data && data.error && data.error.message) || "unknown";
+      return res.status(502).json({ error: "AI service error: " + detail });
     }
 
     const text = data.candidates[0].content.parts.map(p => p.text || "").join("");
