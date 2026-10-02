@@ -1,3 +1,5 @@
+const MODELS = ["gemini-3.8-flash", "gemini-3-flash-preview"];
+
 module.exports = async (req, res) => {
   if (req.method !== "POST") return res.status(405).json({ error: "Use POST" });
 
@@ -16,44 +18,54 @@ Rules:
 - area: "a" and "b" are the area bounds, with xmin <= a < b <= xmax.
 - Always include all six visual fields.`;
 
-  try {
-    const r = await fetch(
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-goog-api-key": process.env.GEMINI_API_KEY
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts: [{ text: question }] }],
-          generationConfig: { responseMimeType: "application/json" }
-        })
+  let lastError = "unknown";
+
+  for (const model of MODELS) {
+    try {
+      const r = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent",
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-goog-api-key": process.env.GEMINI_API_KEY
+          },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts: [{ text: question }] }],
+            generationConfig: { responseMimeType: "application/json" }
+          })
+        }
+      );
+      const data = await r.json();
+
+      if (!r.ok) {
+        lastError = model + ": " + ((data && data.error && data.error.message) || r.status);
+        console.error("Gemini error:", lastError);
+        continue; // try the next model
       }
-    );
-    const data = await r.json();
-    if (!r.ok) {
-      console.error("Gemini error:", JSON.stringify(data));
-      const detail = (data && data.error && data.error.message) || "unknown";
-      return res.status(502).json({ error: "AI service error: " + detail });
+
+      const text = data.candidates[0].content.parts.map(p => p.text || "").join("");
+      const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+
+      const v = parsed.visual;
+      const ok =
+        parsed.explanation && v &&
+        ["tangent", "area"].includes(v.type) &&
+        typeof v.f === "string" && /^[0-9a-z+\-*\/^().\s]{1,60}$/i.test(v.f) &&
+        [v.xmin, v.xmax, v.a, v.b].every(n => typeof n === "number") &&
+        v.xmin < v.xmax;
+      if (!ok) {
+        lastError = model + ": unusable output";
+        continue;
+      }
+
+      return res.status(200).json(parsed);
+    } catch (e) {
+      lastError = model + ": " + e.message;
+      console.error(e);
     }
-
-    const text = data.candidates[0].content.parts.map(p => p.text || "").join("");
-    const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
-
-    const v = parsed.visual;
-    const ok =
-      parsed.explanation && v &&
-      ["tangent", "area"].includes(v.type) &&
-      typeof v.f === "string" && /^[0-9a-z+\-*\/^().\s]{1,60}$/i.test(v.f) &&
-      [v.xmin, v.xmax, v.a, v.b].every(n => typeof n === "number") &&
-      v.xmin < v.xmax;
-    if (!ok) return res.status(502).json({ error: "The AI returned something unusable. Try rephrasing." });
-
-    return res.status(200).json(parsed);
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: "Something went wrong. Try again." });
   }
+
+  return res.status(502).json({ error: "AI service error: " + lastError });
 };
