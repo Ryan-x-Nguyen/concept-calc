@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concept Calc</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.2/math.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 30px auto; padding: 0 16px; }
+  input[type=text] { width: 100%; padding: 10px; font-size: 16px; box-sizing: border-box; }
+  button { margin-top: 8px; padding: 10px 18px; font-size: 16px; cursor: pointer; }
+  #explanation { margin: 16px 0; line-height: 1.5; }
+  #status { color: #666; }
+  #controls { margin: 8px 0; }
+</style>
+</head>
+<body>
+<h1>Concept Calc</h1>
+<p>Ask a calculus question and see the concept, not just the formula.</p>
+<input type="text" id="q" placeholder="Why does the derivative of x^2 equal 2x?">
+<button id="go">Explain</button>
+<p id="status"></p>
+<div id="explanation"></div>
+<div id="controls"></div>
+<div id="plot"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+$("go").onclick = async () => {
+  const question = $("q").value.trim();
+  if (!question) return;
+  $("status").textContent = "Thinking...";
+  $("explanation").textContent = "";
+  $("controls").innerHTML = "";
+  Plotly.purge("plot");
+  try {
+    const r = await fetch("/api/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question })
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "Request failed");
+    $("status").textContent = "";
+    $("explanation").textContent = data.explanation;
+    drawVisual(data.visual);
+  } catch (e) {
+    $("status").textContent = "Error: " + e.message;
+  }
+};
+
+function linspace(a, b, n) {
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(a + (b - a) * i / (n - 1));
+  return out;
+}
+
+function drawVisual(v) {
+  const node = math.compile(v.f);
+  const f = x => node.evaluate({ x });
+  if (v.type === "tangent") drawTangent(f, v);
+  else drawArea(f, v);
+}
+
+function yRange(f, v) {
+  const ys = linspace(v.xmin, v.xmax, 200).map(f).filter(Number.isFinite);
+  const lo = Math.min(...ys), hi = Math.max(...ys);
+  const pad = (hi - lo) * 0.15 || 1;
+  return [lo - pad, hi + pad];
+}
+
+function drawTangent(f, v) {
+  $("controls").innerHTML =
+    'Move the point: x = <span id="aval"></span><br>' +
+    '<input type="range" id="slider" style="width:100%" min="' + v.xmin +
+    '" max="' + v.xmax + '" step="0.05" value="' + v.a + '">';
+  const xs = linspace(v.xmin, v.xmax, 300);
+  const range = yRange(f, v);
+  const render = () => {
+    const a = parseFloat($("slider").value);
+    $("aval").textContent = a.toFixed(2);
+    const h = 1e-5;
+    const slope = (f(a + h) - f(a - h)) / (2 * h);
+    Plotly.react("plot", [
+      { x: xs, y: xs.map(f), mode: "lines", name: "f(x)" },
+      { x: xs, y: xs.map(x => f(a) + slope * (x - a)), mode: "lines",
+        name: "tangent (slope " + slope.toFixed(2) + ")" },
+      { x: [a], y: [f(a)], mode: "markers", name: "point" }
+    ], { margin: { t: 20 }, yaxis: { range } });
+  };
+  $("slider").oninput = render;
+  render();
+}
+
+function drawArea(f, v) {
+  $("controls").innerHTML =
+    'Number of rectangles: <span id="nval"></span> | Estimated area: <span id="sum"></span><br>' +
+    '<input type="range" id="slider" style="width:100%" min="1" max="60" step="1" value="4">';
+  const xs = linspace(v.xmin, v.xmax, 300);
+  const range = yRange(f, v);
+  const render = () => {
+    const n = parseInt($("slider").value);
+    const dx = (v.b - v.a) / n;
+    let sum = 0;
+    const shapes = [];
+    for (let i = 0; i < n; i++) {
+      const x = v.a + i * dx;
+      const y = f(x);
+      sum += y * dx;
+      shapes.push({ type: "rect", x0: x, x1: x + dx, y0: 0, y1: y,
+        fillcolor: "rgba(0,120,255,0.3)", line: { width: 1 } });
+    }
+    $("nval").textContent = n;
+    $("sum").textContent = sum.toFixed(3);
+    Plotly.react("plot", [
+      { x: xs, y: xs.map(f), mode: "lines", name: "f(x)" }
+    ], { margin: { t: 20 }, yaxis: { range }, shapes });
+  };
+  $("slider").oninput = render;
+  render();
+}
+</script>
+</body>
+</html>
