@@ -8,7 +8,7 @@ FUNCS = {"sin": math.sin, "cos": math.cos, "tan": math.tan,
          "exp": math.exp, "log": math.log, "sqrt": math.sqrt}
 
 SYSTEM = """You are a calculus teacher who explains concepts, not memorized formulas.
-You have tools. For a tangent/derivative question, call derivative_at. For an area/integral question, call riemann_sum with a small n like 4 and again with a large n like 100. Use the returned numbers in your explanation.
+For a limit question, call limit_at, then use a tangent visual. For a tangent/derivative question, call derivative_at. For an area/integral question, call riemann_sum with a small n like 4 and again with a large n like 100. Use the returned numbers in your explanation.
 After using tools, reply with ONLY a JSON object, no other text, in this exact shape:
 {"explanation": "...", "visual": {"type": "tangent" or "area", "f": "...", "xmin": number, "xmax": number, "a": number, "b": number}}
 Rules:
@@ -45,10 +45,22 @@ DECLARATIONS = [
             "required": ["f", "a", "b", "n"],
         },
     },
+    {
+        "name": "limit_at",
+        "description": "Check what f approaches as x nears a point, from the left and right.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "f": {"type": "STRING", "description": "Function of x"},
+                "x": {"type": "NUMBER", "description": "Point x approaches"},
+            },
+            "required": ["f", "x"],
+        },
+    },
 ]
 
 
-# ---------- safe math evaluator (never uses eval) ----------
+# safe math evaluator (never uses eval)
 def make_f(expr):
     if not isinstance(expr, str) or not SAFE.match(expr):
         raise ValueError("bad function")
@@ -88,7 +100,7 @@ def make_f(expr):
     return f
 
 
-# ---------- tools the AI can call ----------
+# tools the AI can call
 def derivative_at(f, x):
     fn = make_f(f)
     h = 1e-5
@@ -101,12 +113,17 @@ def riemann_sum(f, a, b, n):
     dx = (b - a) / n
     total = sum(fn(a + i * dx) * dx for i in range(n))
     return {"estimate": total, "rectangles": n}
+         
+def limit_at(f, x):
+    fn = make_f(f)
+    h = 1e-6
+    left, right = fn(x - h), fn(x + h)
+    return {"left": left, "right": right, "limit_exists": abs(left - right) < 1e-3}
+
+TOOLS = {"derivative_at": derivative_at, "riemann_sum": riemann_sum, "limit_at": limit_at}
 
 
-TOOLS = {"derivative_at": derivative_at, "riemann_sum": riemann_sum}
-
-
-# ---------- Gemini calls ----------
+# Gemini calls 
 def call_gemini(model, contents):
     url = ("https://generativelanguage.googleapis.com/v1beta/models/"
            + model + ":generateContent")
@@ -173,7 +190,7 @@ def valid(parsed):
     )
 
 
-# ---------- Vercel handler ----------
+# Vercel handler
 class handler(BaseHTTPRequestHandler):
     def _send(self, code, obj):
         body = json.dumps(obj).encode()
