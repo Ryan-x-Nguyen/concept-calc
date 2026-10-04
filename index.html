@@ -93,7 +93,8 @@
   }
   #explanation { margin: 0; font-size: 1.08rem; max-width: 62ch; }
 
-  .sheet { padding: 16px 12px 8px; }
+  .sheet { padding: 16px 12px 8px; overflow: hidden; }
+  #plot { width: 100%; height: 420px; }
   #controls { padding: 0 12px 4px; font-weight: 500; }
   #controls .val { color: var(--blue); font-variant-numeric: tabular-nums; }
   input[type=range] { width: 100%; accent-color: var(--blue); margin: 8px 0 0; }
@@ -219,9 +220,11 @@ function yRange(f, v) {
 
 function layout(range, extra) {
   return Object.assign({
+    height: 420,
+    autosize: true,
     margin: { t: 16, r: 16, b: 40, l: 48 },
-    paper_bgcolor: "rgba(0,0,0,0)",
-    plot_bgcolor: "rgba(0,0,0,0)",
+    paper_bgcolor: "#ffffff",
+    plot_bgcolor: "#ffffff",
     font: { family: "DM Sans, system-ui, sans-serif", color: COLORS.ink },
     xaxis: { gridcolor: "#e4eaf5", zerolinecolor: COLORS.ink },
     yaxis: { range, gridcolor: "#e4eaf5", zerolinecolor: COLORS.ink },
