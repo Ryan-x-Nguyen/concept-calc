@@ -2,7 +2,7 @@
 
 A concept-first calculus explainer. Type a question like "Why does the derivative of x^2 equal 2x?" and get a short plain-language explanation plus an interactive graph you can play with.
 
-**Live demo:** (paste your Vercel link here)
+**Live demo:** ([(https://concept-calc.vercel.app/)])
 
 ## Why I built it
 Most students memorize calculus formulas instead of understanding the ideas behind them. Concept Calc shows the intuition visually first, then connects it to the formula. It comes from tutoring AP Calculus students.
