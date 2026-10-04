@@ -48,6 +48,7 @@ See [BUGS.md](BUGS.md) for the problems I hit (retired model name, high-demand e
 - Explanations are AI-generated and may contain mistakes, so double-check anything important
 
 ## Next steps
+- Expose derivative_at and riemann_sum as an MCP server so other AI clients can use them
 - More tools and visuals (limits, optimization, second derivative)
 - Step-by-step practice problems with feedback
 - Automated tests instead of manual ones
