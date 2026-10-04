@@ -80,6 +80,15 @@
   details ul { margin: 10px 0 0; padding-left: 20px; }
   details li { margin-bottom: 6px; overflow-wrap: anywhere; font-family: ui-monospace, Menlo, monospace; font-size: .82rem; }
 
+  .feedback { display: flex; align-items: center; gap: 10px; margin-top: 16px; color: var(--muted); font-size: .95rem; }
+  .fb {
+    font-size: 1.1rem; cursor: pointer; background: #fff; border: 1px solid var(--line);
+    border-radius: 999px; padding: 4px 12px;
+  }
+  .fb:hover:not(:disabled) { border-color: var(--blue); }
+  .fb:disabled { cursor: default; opacity: .5; }
+  .fb.picked { opacity: 1; border-color: var(--blue); background: #eef2ff; }
+
   footer { margin-top: 48px; color: var(--muted); font-size: .85rem; }
 </style>
 </head>
@@ -112,6 +121,11 @@
     <div class="card">
       <div id="controls"></div>
       <div class="plotwrap"><div id="plot"></div></div>
+      <div class="feedback">
+        <span id="fbText">Was this helpful?</span>
+        <button class="fb" data-v="up" aria-label="Helpful">👍</button>
+        <button class="fb" data-v="down" aria-label="Not helpful">👎</button>
+      </div>
     </div>
   </section>
 
@@ -130,6 +144,7 @@ async function ask() {
   $("result").hidden = true;
   $("controls").innerHTML = "";
   $("toolsBox").hidden = true;
+  resetFeedback();
   Plotly.purge("plot");
   try {
     const r = await fetch("/api/explain", {
@@ -255,6 +270,20 @@ function drawArea(f, v) {
   $("slider").oninput = render;
   render();
 }
+
+function resetFeedback() {
+  $("fbText").textContent = "Was this helpful?";
+  document.querySelectorAll(".fb").forEach(b => { b.disabled = false; b.classList.remove("picked"); });
+}
+document.querySelectorAll(".fb").forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll(".fb").forEach(x => x.disabled = true);
+    b.classList.add("picked");
+    $("fbText").textContent = b.dataset.v === "up"
+      ? "Thanks, glad it helped."
+      : "Thanks. Try rephrasing your question for a clearer answer.";
+  };
+});
 </script>
 </body>
 </html>
